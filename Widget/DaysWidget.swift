@@ -32,12 +32,37 @@ struct EventQuery: EntityQuery {
     }
 }
 
-struct SelectEventIntent: WidgetConfigurationIntent {
-    static let title: LocalizedStringResource = "选择显示的事件"
-    static let description = IntentDescription("选择这个小组件要显示的天数事件")
+// MARK: - 计算方式（小组件配置参数）
 
-    @Parameter(title: "事件")
+enum CountMode: String, AppEnum {
+    case up
+    case down
+
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "计算方式")
+    static let caseDisplayRepresentations: [CountMode: DisplayRepresentation] = [
+        .up: DisplayRepresentation(title: "累计天数", subtitle: "从那天数到今天"),
+        .down: DisplayRepresentation(title: "倒数日", subtitle: "距离那天还有几天"),
+    ]
+}
+
+struct SelectEventIntent: WidgetConfigurationIntent {
+    static let title: LocalizedStringResource = "天数设置"
+    static let description = IntentDescription("有 App 数据时直接选事件；没有的话在这里手填名称和日期")
+
+    @Parameter(title: "App 内事件")
     var event: EventEntity?
+
+    @Parameter(title: "名称（手填）")
+    var manualName: String?
+
+    @Parameter(title: "日期（手填）")
+    var manualDate: Date?
+
+    @Parameter(title: "计算方式")
+    var mode: CountMode?
+
+    @Parameter(title: "每年重复")
+    var repeatYearly: Bool?
 }
 
 // MARK: - Timeline
@@ -72,6 +97,13 @@ struct Provider: AppIntentTimelineProvider {
         return ev
     }
 
+    private static let dateFormat: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    /// 事件来源优先级：① 配置里选中的 App 事件 → ② App 内置顶/第一个 → ③ 配置里手填的名称+日期
     private func makeEntry(for configuration: SelectEventIntent, in context: Context) -> DaysEntry {
         let all = Store.sortedEvents()
         var selected: Event?
@@ -81,6 +113,9 @@ struct Provider: AppIntentTimelineProvider {
         if selected == nil {
             selected = all.first { $0.pinned } ?? all.first
         }
+        if selected == nil {
+            selected = manualEvent(from: configuration)
+        }
 
         var next: Event?
         if context.family == .systemMedium {
@@ -89,6 +124,18 @@ struct Provider: AppIntentTimelineProvider {
                 .min { (DayMath.countdown($0) ?? 0) < (DayMath.countdown($1) ?? 0) }
         }
         return DaysEntry(date: Date(), event: selected, nextCountdown: next)
+    }
+
+    /// 免费签名（无 App Groups）时的兜底：直接用小组件配置里手填的内容
+    private func manualEvent(from configuration: SelectEventIntent) -> Event? {
+        let name = (configuration.manualName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, let date = configuration.manualDate else { return nil }
+        var ev = Event()
+        ev.name = name
+        ev.date = Self.dateFormat.string(from: date)
+        ev.type = (configuration.mode == .down) ? .down : .up
+        ev.repeatYearly = configuration.repeatYearly ?? false
+        return ev
     }
 }
 
@@ -180,24 +227,26 @@ struct DaysWidgetView: View {
 
     @ViewBuilder
     private var mediumView: some View {
-        HStack(spacing: 0) {
-            if let ev = entry.event {
-                WidgetCardView(event: ev)
+        if let first = entry.event {
+            HStack(spacing: 0) {
+                WidgetCardView(event: first)
                     .frame(maxWidth: .infinity)
-            }
-            if let next = entry.nextCountdown, let n = DayMath.countdown(next) {
-                Divider().frame(height: 56)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("下一个")
-                        .font(.system(size: 11))
-                        .foregroundColor(.gray)
-                    Text(next.name)
-                        .font(.system(size: 13))
-                    Text(n == 0 ? "今天" : "\(n) 天后")
-                        .font(.system(size: 15, weight: .medium))
+                if let next = entry.nextCountdown, let n = DayMath.countdown(next) {
+                    Divider().frame(height: 56)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("下一个")
+                            .font(.system(size: 11))
+                            .foregroundColor(.gray)
+                        Text(next.name)
+                            .font(.system(size: 13))
+                        Text(n == 0 ? "今天" : "\(n) 天后")
+                            .font(.system(size: 15, weight: .medium))
+                    }
+                    .padding(.horizontal, 14)
                 }
-                .padding(.horizontal, 14)
             }
+        } else {
+            emptyView
         }
     }
 
@@ -207,7 +256,7 @@ struct DaysWidgetView: View {
             let d = ev.display()
             Text("\(ev.name) \(d.big)\(d.unit)")
         } else {
-            Text("暂无事件")
+            Text("未设置天数")
         }
     }
 
@@ -228,10 +277,16 @@ struct DaysWidgetView: View {
     }
 
     private var emptyView: some View {
-        Text("暂无事件")
-            .font(.system(size: 12))
-            .foregroundColor(.gray)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        VStack(spacing: 3) {
+            Text("未设置天数")
+                .font(.system(size: 12, weight: .medium))
+            Text("长按小组件 → 编辑小组件\n填入名称和日期")
+                .font(.system(size: 9.5))
+                .multilineTextAlignment(.center)
+                .opacity(0.75)
+        }
+        .foregroundColor(.gray)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 }
 
