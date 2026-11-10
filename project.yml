@@ -7,11 +7,12 @@ options:
 
 settings:
   base:
-    DEVELOPMENT_TEAM: ""
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ""
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
-    GENERATE_INFOPLIST_FILE: YES
 
 targets:
   Days:
@@ -25,11 +26,15 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.daysapp.Days
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        PRODUCT_NAME: Days
+        GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Days
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
         CODE_SIGN_ENTITLEMENTS: App/Days.entitlements
         TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: NO
 
   DaysWidget:
     type: app-extension
@@ -38,18 +43,28 @@ targets:
       - path: Widget
       - path: App/Models.swift
     info:
-      path: Widget/Info.plist
+      path: Support/DaysWidget-Info.plist
       properties:
+        CFBundleDisplayName: DaysWidget
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.daysapp.Days.DaysWidget
+        PRODUCT_NAME: DaysWidget
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
         CODE_SIGN_ENTITLEMENTS: Widget/DaysWidget.entitlements
         TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: NO
 
 schemes:
   Days:
     build:
       targets:
         Days: all
+        DaysWidget: all
+    run:
+      config: Debug
+    archive:
+      config: Release

@@ -378,9 +378,9 @@ struct BackgroundPicker: View {
                             .font(.system(size: 13))
                             .foregroundColor(.gray)
                             .monospacedDigit()
-                        Slider(value: $opacity, in: 5...100, step: 5) { _ in
+                        Slider(value: $opacity, in: 5...100, step: 5, onEditingChanged: { _ in
                             Store.backgroundOpacity = Int(opacity)
-                        }
+                        })
                     }
                 }
             }

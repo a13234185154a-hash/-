@@ -16,22 +16,38 @@ jobs:
         run: brew install xcodegen
 
       - name: Generate Xcode project
-        run: xcodegen generate
+        run: |
+          xcodegen --version
+          xcodegen generate
+          ls -la
 
-      - name: Show Xcode version
-        run: xcodebuild -version
+      - name: Show project info
+        run: |
+          xcodebuild -version
+          xcodebuild -list -project Days.xcodeproj
 
       - name: Build archive (unsigned)
         run: |
+          set -o pipefail
           xcodebuild archive \
             -project Days.xcodeproj \
             -scheme Days \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath build/Days.xcarchive \
+            -derivedDataPath build/dd \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGN_IDENTITY="" \
+            2>&1 | tee build-log.txt
+
+      - name: Dump errors on failure
+        if: failure()
+        run: |
+          echo "======== 编译错误（error: 行）========"
+          grep -n "error:" build-log.txt | head -60 || echo "(没有匹配到 error:，请看下面末尾日志)"
+          echo "======== 日志末尾 80 行 ========"
+          tail -80 build-log.txt
 
       - name: Package unsigned IPA
         run: |
@@ -45,3 +61,11 @@ jobs:
           name: Days-unsigned-ipa
           path: build/Days-unsigned.ipa
           retention-days: 30
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build-log.txt
+          retention-days: 7
