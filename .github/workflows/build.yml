@@ -1,0 +1,47 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build archive (unsigned)
+        run: |
+          xcodebuild archive \
+            -project Days.xcodeproj \
+            -scheme Days \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/Days.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p build/Payload
+          cp -R build/Days.xcarchive/Products/Applications/Days.app build/Payload/
+          cd build && zip -qry Days-unsigned.ipa Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Days-unsigned-ipa
+          path: build/Days-unsigned.ipa
+          retention-days: 30
