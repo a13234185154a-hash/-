@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-15
@@ -69,3 +72,13 @@ jobs:
           name: build-log
           path: build-log.txt
           retention-days: 7
+
+      - name: Publish release (免登录下载)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest build/Days-unsigned.ipa \
+            --title "Days 最新构建" \
+            --notes "自动构建 $(date -u '+%Y-%m-%d %H:%M UTC')，产物为未签名 ipa，需用 Sideloadly / AltStore 自行签名安装。"
